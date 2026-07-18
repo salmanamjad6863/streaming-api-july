@@ -1,0 +1,16 @@
+{
+  "name": "streaming-api",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "dev": "node --watch server.js",
+    "start": "node server.js"
+  },
+  "dependencies": {
+    "@hono/node-server": "^1.14.2",
+    "axios": "^1.7.0",
+    "cheerio": "^1.0.0",
+    "hono": "^4.7.10"
+  }
+}
