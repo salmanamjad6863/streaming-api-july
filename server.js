@@ -201,8 +201,17 @@ app.get('/api/v2/proxy', async (c) => {
   if (isM3u8) {
     const text = await upstream.text();
     const base = targetUrl.substring(0, targetUrl.lastIndexOf('/') + 1);
+    // Railway terminates TLS at the edge; c.req.url is often http:// inside the container.
+    // Force https for public hosts so HTTPS sites don't get Mixed Content on rewritten URLs.
     const self = new URL(c.req.url);
-    const proxyBase = `${self.origin}/api/v2/proxy?url=`;
+    const fwdHost = (c.req.header('x-forwarded-host') || '').split(',')[0].trim();
+    const host = fwdHost || self.host;
+    const isLocal =
+      host.startsWith('localhost') ||
+      host.startsWith('127.0.0.1') ||
+      host.startsWith('[::1]');
+    const proto = isLocal ? 'http' : 'https';
+    const proxyBase = `${proto}://${host}/api/v2/proxy?url=`;
 
     const rewritten = text
       .split('\n')
