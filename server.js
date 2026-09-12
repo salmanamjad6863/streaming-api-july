@@ -145,12 +145,24 @@ app.get('/api/v2/proxy', async (c) => {
       Referer: 'https://megaplay.buzz/',
     },
     {
+      Referer: 'https://ncdn.imgnex.top/',
+      Origin: 'https://ncdn.imgnex.top',
+    },
+    {
+      Referer: 'https://bb.akirax.buzz/',
+      Origin: 'https://bb.akirax.buzz',
+    },
+    {
       Referer: 'https://megacloud.blog/',
       Origin: 'https://megacloud.blog',
     },
     {
       Referer: 'https://anikototv.to/',
       Origin: 'https://anikototv.to',
+    },
+    {
+      Referer: 'https://megap.norami.top/',
+      Origin: 'https://megap.norami.top',
     },
     {
       // last resort: no Referer/Origin (some CDNs only check UA)
@@ -160,12 +172,17 @@ app.get('/api/v2/proxy', async (c) => {
   const ua =
     'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
 
+  // Retry soft CDN failures (not only 403) — Bleach/imgnex segments often flap 502
+  const retryStatuses = new Set([403, 429, 500, 502, 503]);
+  const rangeHeader = c.req.header('range');
+
   let upstream = null;
   for (const headers of headerSets) {
     try {
       const res = await fetch(targetUrl, {
         headers: {
           ...headers,
+          ...(rangeHeader ? { Range: rangeHeader } : {}),
           Accept: '*/*',
           'Accept-Language': 'en-US,en;q=0.9',
           'User-Agent': ua,
@@ -176,9 +193,8 @@ app.get('/api/v2/proxy', async (c) => {
         upstream = res;
         break;
       }
-      // Keep last non-OK so we can report real status (e.g. 403 from nexabloom)
       upstream = res;
-      if (res.status !== 403) break;
+      if (!retryStatuses.has(res.status)) break;
     } catch (e) {
       console.error('[proxy] fetch failed', e.message);
     }
@@ -192,7 +208,7 @@ app.get('/api/v2/proxy', async (c) => {
     );
   }
 
-  const contentType =
+  let contentType =
     upstream.headers.get('content-type') || 'application/octet-stream';
   const isM3u8 =
     targetUrl.includes('.m3u8') ||
@@ -244,6 +260,11 @@ app.get('/api/v2/proxy', async (c) => {
   }
 
   const buf = await upstream.arrayBuffer();
+  // imgnex/akirax serve MPEG-TS as .png with bogus content-types — fix for hls.js
+  const bytes = new Uint8Array(buf);
+  if (bytes.length > 0 && bytes[0] === 0x47) {
+    contentType = 'video/mp2t';
+  }
   const headers = {
     ...cors,
     'Content-Type': contentType,
