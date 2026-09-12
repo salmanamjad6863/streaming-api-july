@@ -3,7 +3,7 @@
 HiAnime-compatible local API for `anime-world`.
 
 **Catalog:** Anikoto  
-**Playback:** Megaplay → **direct HLS** (`master.m3u8`) via native player (no iframe ads)
+**Playback:** Megaplay → decrypt `enc` / plain `sources.file` → **direct HLS** (`master.m3u8`) via native player (no iframe ads)
 
 ## Run
 
@@ -25,8 +25,8 @@ NEXT_PUBLIC_USE_PROXY=true
 
 1. Search/episodes from Anikoto JSON API  
 2. Episode embeds point at Megaplay  
-3. API resolves `data-id` → `/stream/getSources` → `master.m3u8` + VTT subs  
-4. Client plays HLS in your `VideoPlayer` (not the Megaplay iframe)  
+3. API prefers `/stream/getSourcesNew` → `ncdn.imgnex.top` m3u8 (proxy-friendly); falls back to encrypted `getSources` / `enc`  
+4. Client plays HLS via proxy with Megaplay Referer (not the Megaplay iframe)  
 5. `/api/v2/proxy` injects Megaplay Referer so the CDN allows segments  
 
 If Megaplay HLS resolve fails, it falls back to the embed iframe.

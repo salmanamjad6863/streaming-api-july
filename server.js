@@ -142,12 +142,18 @@ app.get('/api/v2/proxy', async (c) => {
       Origin: 'https://megaplay.buzz',
     },
     {
+      Referer: 'https://megaplay.buzz/',
+    },
+    {
       Referer: 'https://megacloud.blog/',
       Origin: 'https://megacloud.blog',
     },
     {
       Referer: 'https://anikototv.to/',
       Origin: 'https://anikototv.to',
+    },
+    {
+      // last resort: no Referer/Origin (some CDNs only check UA)
     },
   ];
 
@@ -161,26 +167,27 @@ app.get('/api/v2/proxy', async (c) => {
         headers: {
           ...headers,
           Accept: '*/*',
+          'Accept-Language': 'en-US,en;q=0.9',
           'User-Agent': ua,
         },
+        redirect: 'follow',
       });
-      if (res.ok) {
+      if (res.ok || res.status === 206) {
         upstream = res;
         break;
       }
-      if (res.status !== 403) {
-        upstream = res;
-        break;
-      }
+      // Keep last non-OK so we can report real status (e.g. 403 from nexabloom)
+      upstream = res;
+      if (res.status !== 403) break;
     } catch (e) {
       console.error('[proxy] fetch failed', e.message);
     }
   }
 
   if (!upstream) return fail(c, new Error('Upstream fetch failed'), 502);
-  if (!upstream.ok) {
+  if (!upstream.ok && upstream.status !== 206) {
     return c.json(
-      { error: `Upstream ${upstream.status}` },
+      { error: `Upstream ${upstream.status}`, url: targetUrl },
       502
     );
   }
